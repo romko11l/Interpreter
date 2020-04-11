@@ -137,7 +137,7 @@ public:
 	tabl_ident (int max_size)	
 	{
 		table=new Ident[size=max_size];
-		top=1;  // почему не 0?
+		top=1;  
 	}
 	~tabl_ident ()
 	{
@@ -278,7 +278,6 @@ const char * Scanner::TD[] =
 	"<",  
 	"<=", 
 	",", 
-	"@", 
 	NULL
 };
 
@@ -331,7 +330,7 @@ Lex Scanner::get_lex ()
 	int lex_pos;
 	int integer;
 	double real;
-	int exp=-1;
+	unsigned long exp=10;
 	CS=H;
 	// Реализация автомата
 	do  //первое чтение осуществлено в конструкторе Scanner
@@ -437,18 +436,29 @@ Lex Scanner::get_lex ()
 					real=integer;
 					CS=REALNUM;
 				}
+				else if (isalpha(c)||c=='('||c=='{')
+				{
+					throw ("NUMB:ERR");
+				}
 				else 
-				{;
+				{
 					return Lex(LEX_CINT,0,integer);
 				}
 				break;
 			}
 			case REALNUM:
 			{
+				double t;
 				if (isdigit(c))
 				{
-					real=real+(c-'0')*pow(10,exp--);
+					t=c-'0';
+					real=real+double(t/exp);
+					exp=10*exp;
 					gc();
+				}
+				else if (isalpha(c)||c=='('||c=='{')
+				{
+					throw ("REALNUM:ERR");
 				}
 				else
 				{
