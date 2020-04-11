@@ -3,8 +3,11 @@
 #include <cctype>
 #include <cstdio>
 #include <cmath>
+#include <fstream>
+#include <string>
 
-enum type_of_lex  //кажется, тут далеко не полный список
+
+enum type_of_lex  
 {
     LEX_NULL,     // //0
     LEX_PROGRAM,  // program //1
@@ -42,20 +45,48 @@ enum type_of_lex  //кажется, тут далеко не полный спи
     LEX_CONT,     // continue //33
     LEX_REAL,     // real (имя типа) //34
     LEX_COMMA,    // , //35
-    LEX_FIN       // @ //36
+    LEX_FIN       //  //36
 };
 
-// нужно сделать класс Ident - родительским - унаследовать от него строковый класс, класс, описывающий real, и класс, описывающий целые числа
 
 class Lex
 {
 	type_of_lex t_lex;
 	int v_lex; // показывает, каким номером лексема лежит в соответствующей таблице (если не лежит ни в какой таблице - 0)
+	int int_value;
+	double real_value;
+	std::string str_value;
+	bool is_int, is_real, is_str;
 public:
-	Lex (type_of_lex t = LEX_NULL, int v=0)
+	Lex (type_of_lex t = LEX_NULL, int v = 0)
     {
         t_lex=t;
         v_lex=v;
+        is_int=is_real=is_str=false;
+    }
+    Lex (type_of_lex t, int v, int i)
+    {
+    	t_lex=t;
+        v_lex=v;
+        is_real=is_str=false;
+        is_int=true;
+        int_value=i;
+    }
+    Lex (type_of_lex t, int v, double r)
+    {
+        t_lex=t;
+        v_lex=v;
+        is_int=is_str=false;
+        is_real=true;
+        real_value=r;
+    }
+    Lex (type_of_lex t, int v, std::string s)
+    {
+        t_lex=t;
+        v_lex=v;
+        is_int=is_real=false;
+        is_str=true;
+        str_value=s;
     }
     type_of_lex get_type ()
     {
@@ -65,17 +96,13 @@ public:
     {
         return v_lex;
     }
-    friend std::ostream& operator << (std::ostream &s, Lex l)
-    {
-        s << '(' << l.t_lex << ',' << l.v_lex << ");";
-        return s;
-    }
+    friend std::ostream& operator << (std::ostream &s, Lex l);
+    friend std::ofstream& operator << (std::ofstream &s, Lex l);
 };
 
 class Ident
 {
 	char * name;
-	type_of_lex type;
 	bool is_used;
 public:
 	Ident ()
@@ -98,14 +125,6 @@ public:
 		is_used=true;
 		name=new char [strlen(n)+1];
 		strcpy(name, n);
-	}
-	type_of_lex get_type ()
-	{
-		return type;
-	}
-	void put_type (type_of_lex t)
-	{
-		type=t;
 	}
 };
 
@@ -215,6 +234,8 @@ public:
 		fclose(fp);
 	}
 	Lex get_lex();
+	friend std::ostream& operator << (std::ostream &s, Lex l);
+	friend std::ofstream& operator << (std::ofstream &s, Lex l);
 };
 
 const char * Scanner::TW[] = 
@@ -237,7 +258,7 @@ const char * Scanner::TW[] =
 	NULL
 };
 
-const char * Scanner::TD[] = //нужно переделать так, чтобы порядок совпадал с type_of_lex Scanner::dlms[]
+const char * Scanner::TD[] = 
 {
 	"",   
 	"+",  
@@ -312,6 +333,7 @@ Lex Scanner::get_lex ()
 	double real;
 	int exp=-1;
 	CS=H;
+	// Реализация автомата
 	do  //первое чтение осуществлено в конструкторе Scanner
 	{
 		switch (CS)
@@ -416,8 +438,8 @@ Lex Scanner::get_lex ()
 					CS=REALNUM;
 				}
 				else 
-				{
-					return Lex(LEX_CINT,0);
+				{;
+					return Lex(LEX_CINT,0,integer);
 				}
 				break;
 			}
@@ -430,7 +452,7 @@ Lex Scanner::get_lex ()
 				}
 				else
 				{
-					return Lex(LEX_CREAL,0);
+					return Lex(LEX_CREAL,0,real);
 				}
 				break;
 			}	
@@ -522,7 +544,7 @@ Lex Scanner::get_lex ()
 				{
 					add();
 					gc();
-					return Lex(LEX_CSTRING,0);
+					return Lex(LEX_CSTRING,0,(std::string)buf);
 				}
 				else if (c==EOF)
 				{
@@ -556,18 +578,109 @@ Lex Scanner::get_lex ()
 	while (true);
 }
 
+std::ostream& operator << (std::ostream &s, Lex l)
+{
+	if (l.is_int==true)
+	{
+		s << "Сама лексема: \"" << l.int_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else if (l.is_real==true)
+	{
+		s << "Сама лексема: \"" << l.real_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else if (l.is_str==true)
+	{
+		s << "Сама лексема: \"" << l.str_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else
+	{
+		if (l.t_lex==LEX_ID)
+		{
+			s << "Сама лексема: \"" << TID[l.v_lex].get_name() << "\", тип лексемы: " << l.t_lex << " (номер в таблице идентификаторов: " << l.v_lex << ")" << std::endl;
+		}
+		else if (l.t_lex==LEX_FIN)
+		{
+			s << "Сама лексема: \"EOF\", тип лексемы: " << l.t_lex << std::endl;
+		}
+		else if (l.t_lex==Scanner::dlms[l.v_lex])
+		{
+			s << "Сама лексема: \"" << Scanner::TD[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+		}
+		else
+		{
+			s << "Сама лексема: \"" << Scanner::TW[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+		}
+	}
+	return s;
+}
+
+std::ofstream& operator << (std::ofstream &s, Lex l)
+{
+	if (l.is_int==true)
+	{
+		s << "Сама лексема: \"" << l.int_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else if (l.is_real==true)
+	{
+		s << "Сама лексема: \"" << l.real_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else if (l.is_str==true)
+	{
+		s << "Сама лексема: \"" << l.str_value << "\", тип лексемы: " << l.t_lex << std::endl;
+	}
+	else
+	{
+		if (l.t_lex==LEX_ID)
+		{
+			s << "Сама лексема: \"" << TID[l.v_lex].get_name() << "\", тип лексемы: " << l.t_lex << " (номер в таблице идентификаторов: " << l.v_lex << ")" << std::endl;
+		}
+		else if (l.t_lex==LEX_FIN)
+		{
+			s << "Сама лексема: \"EOF\", тип лексемы: " << l.t_lex << std::endl;
+		}
+		else if (l.t_lex==Scanner::dlms[l.v_lex])
+		{
+			s << "Сама лексема: \"" << Scanner::TD[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+		}
+		else
+		{
+			s << "Сама лексема: \"" << Scanner::TW[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+		}
+	}
+	return s;
+}
+
 int main ()
 {
+	std::ofstream fout;
+	fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
+	// prog - исходная программа на модельном языке
 	Scanner scan("./prog");
-	Lex curr_lex;
+	Lex curr_lex(LEX_NULL, 0);
+	try
+	{
 	while (true)
 	{
 		curr_lex=scan.get_lex();
-		std::cout << curr_lex << std::endl;
+		fout << curr_lex;
 		if (curr_lex.get_type()==LEX_FIN)
 		{
 			break;
 		}
 	}
+	}
+	catch (char const *message)
+	{
+		fout.close();
+		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
+		fout << message << std::endl;
+	}
+	catch (std::bad_alloc message)
+	{
+		fout.close();
+		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
+		fout << "bad_alloc" << std::endl;
+	}
+	fout.close();
 	return 0;
 }
