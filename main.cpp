@@ -1033,7 +1033,7 @@ void Parser::FOR()
 		throw curr_lex;
 	}
 	gl();
-	if (c_type!=LEX_SEMICOLON)
+	if (c_type!=LEX_RPAREN)
 	{
 		FOR1();
 	}
@@ -1193,6 +1193,10 @@ void Parser::EXPR7()
 		{
 			throw curr_lex;
 		}
+	}
+	else
+	{
+		throw curr_lex;
 	}
 }
 

@@ -1,0 +1,27 @@
+program 
+{
+	int x=321;
+	real y=234;
+	string my_str, your_str = "234";
+	my_str="may"+your_str;
+	x=y*(3+4+5)-12*(123-120);
+	{
+		read(x);
+	}
+	for (;x<10;x=x+2)
+	{
+		write(my_str, " ");
+		if (y>10*4)
+		{
+			write (your_str);
+		}
+		else
+		{
+
+		}
+	}
+	while (x>10)
+	{
+		x=x/2;
+	}
+}
