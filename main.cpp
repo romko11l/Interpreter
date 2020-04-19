@@ -680,11 +680,12 @@ class Parser
 	void IFELSE();
 	void WHILE();
 	void FOR();
+	void FOR1();
 	void READ();
 	void WRITE();
+	void WRITE1();
 	void COMPLEXOP();
 	void EXPRESSIONOP();
-	void CONTINUE();
 	/* expression */ 
 	void EXPR();
 	void EXPR1();
@@ -876,6 +877,18 @@ void Parser::OP1()
 	{
 		READ();
 	}
+	else if (c_type==LEX_WRITE)
+	{
+		WRITE();
+	}
+	else if (c_type==LEX_WHILE)
+	{
+		WHILE();
+	}
+	else if (c_type==LEX_FOR)
+	{
+		FOR();
+	}
 	else
 	{
 		EXPRESSIONOP();
@@ -941,10 +954,105 @@ void Parser::READ()
 	gl();
 }
 
+void Parser::WRITE()
+{
+	gl();
+	if (c_type!=LEX_LPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	EXPR();
+	WRITE1();
+	if (c_type!=LEX_RPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		throw curr_lex;
+	}
+	gl();
+}
+
+void Parser::WRITE1()
+{
+	if (c_type!=LEX_COMMA)
+	{
+		/* ok - больше ничего не выводим */
+	}
+	else
+	{
+		gl();
+		EXPR();
+		WRITE1();
+	}
+}
+
+void Parser::WHILE()
+{
+	gl();
+	if (c_type!=LEX_LPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	EXPR();
+	if (c_type!=LEX_RPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	OP1();
+}
+
+void Parser::FOR()
+{
+	gl();
+	if (c_type!=LEX_LPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		FOR1();
+	}
+	if (c_type!=LEX_SEMICOLON)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		FOR1();
+	}
+	if (c_type!=LEX_SEMICOLON)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		FOR1();
+	}
+	if (c_type!=LEX_RPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	OP1();
+}
+
+void Parser::FOR1()
+{
+	EXPR();
+}
+
 void Parser::EXPRESSIONOP()
 {
 	EXPR();
-	gl();
 	if (c_type!=LEX_SEMICOLON)
 	{
 		throw curr_lex;
@@ -1079,8 +1187,8 @@ void Parser::EXPR7()
 	}
 	else if (c_type==LEX_LPAREN)
 	{
-		EXPR();
 		gl();
+		EXPR();
 		if (c_type!=LEX_RPAREN)
 		{
 			throw curr_lex;
@@ -1102,6 +1210,7 @@ int main ()
 	}
 	catch (Lex curr_lex)
 	{
+		std::cout << "некорректный синтаксис" << std::endl;
 		fout.close();
 		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
 		fout << curr_lex << std::endl;
