@@ -660,24 +660,451 @@ std::ofstream& operator << (std::ofstream &s, Lex l)
 	return s;
 }
 
+class Parser
+{
+	Lex curr_lex;
+	type_of_lex c_type;
+	Scanner scan;
+
+	void PROG();
+	/* description */
+	void DESCR();
+	void DESCR1();
+	void VAR();
+	void VAR1();
+	void VAR2();
+	void CONST1();
+	/* statement */ 
+	void OP();
+	void OP1();
+	void IFELSE();
+	void WHILE();
+	void FOR();
+	void READ();
+	void WRITE();
+	void COMPLEXOP();
+	void EXPRESSIONOP();
+	void CONTINUE();
+	/* expression */ 
+	void EXPR();
+	void EXPR1();
+	void EXPR11();
+	void EXPR2();
+	void EXPROR();
+	void EXPR3();
+	void EXPRAND();
+	void EXPR4();
+	void EXPR41();
+	void EXPR5();
+	void EXPR51();
+	void EXPR6();
+	void EXPR61();
+	void EXPR7();
+
+	void gl()
+	{
+		curr_lex=scan.get_lex();
+		c_type=curr_lex.get_type();
+		std::cout<< curr_lex << std::endl;
+	}
+
+public:
+	Parser (const char* program) : scan ("./prog") { }
+	void analyze();
+};
+	
+void Parser::analyze()
+{
+	gl();
+	PROG();
+	std::cout << "Is correct" << std::endl;
+}
+
+void Parser::PROG()
+{
+	if (c_type==LEX_PROGRAM)
+	{
+		gl();
+		if (c_type==LEX_LBRACE)
+		{
+			gl();
+			DESCR();
+			OP();
+			if (c_type!=LEX_RBRACE)
+			{
+				throw curr_lex;
+			}
+			gl();
+			if (c_type!=LEX_FIN)
+			{
+				throw curr_lex;
+			}
+		}
+		else 
+		{
+			throw curr_lex;
+		}
+	}
+	else
+	{
+		throw curr_lex;
+	}
+}
+
+void Parser::DESCR()
+{
+	if (c_type==LEX_INT||c_type==LEX_STRING||c_type==LEX_REAL)
+	{
+		gl();
+		DESCR1();
+		if (c_type==LEX_SEMICOLON)
+		{
+			gl();
+			DESCR();
+		}
+		else
+		{
+			throw curr_lex;
+		}
+	}
+	else
+	{
+		/* нет описаний -> идём в OP */
+	}
+}
+
+void Parser::DESCR1()
+{
+	VAR();
+	VAR1();
+}
+
+void Parser::VAR1()
+{
+	if (c_type==LEX_COMMA)
+	{
+		gl();
+		VAR();
+		VAR1();
+	}
+	else
+	{
+		/* в описании нет запятой */ 
+	}
+}
+
+void Parser::VAR()
+{
+	if (c_type==LEX_ID)
+	{
+		gl();
+		VAR2();
+	}
+	else
+	{
+		throw curr_lex;
+	}
+}
+
+void Parser::VAR2()
+{
+	if (c_type==LEX_EQUAL)
+	{
+		gl();
+		CONST1();
+	}
+	else
+	{
+		/* переменная не инициализируется */ 
+	}
+}
+
+void Parser::CONST1()
+{
+	if (c_type==LEX_PLUS||c_type==LEX_MINUS)
+	{
+		gl();
+		if (c_type!=LEX_CINT&&c_type!=LEX_REAL)
+		{
+			throw curr_lex;
+		}
+		gl();
+	}
+	else if (c_type==LEX_CINT||c_type==LEX_CREAL||c_type==LEX_CSTRING)
+	{
+		gl();
+	}
+	else
+	{
+		throw curr_lex;
+	}
+}
+
+void Parser::OP()
+{
+	if (c_type==LEX_RBRACE)
+	{
+		/* переходим в Parser::PROG, либо в Parser::COMPLEXOP */ 
+	}
+	else 
+	{
+		OP1();
+		OP();
+	}
+}
+
+void Parser::OP1()
+{
+	if (c_type==LEX_IF)
+	{
+		IFELSE();
+	}
+	else if (c_type==LEX_LBRACE)
+	{
+		COMPLEXOP();
+	}
+	else if (c_type==LEX_CONT)
+	{
+		gl();
+		if (c_type!=LEX_SEMICOLON)
+		{
+			throw curr_lex;
+		}
+		gl();
+	}
+	else if (c_type==LEX_READ)
+	{
+		READ();
+	}
+	else
+	{
+		EXPRESSIONOP();
+	}
+}
+
+void Parser::IFELSE()
+{
+	gl();
+	if (c_type!=LEX_LPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	EXPR();
+	if (c_type!=LEX_RPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	OP1();
+	if (c_type!=LEX_ELSE)
+	{
+		throw curr_lex;
+	}
+	gl();
+	OP1();
+}
+
+void Parser::COMPLEXOP()
+{
+	gl();
+	OP();
+	if (c_type!=LEX_RBRACE)
+	{
+		throw curr_lex;
+	}
+	gl();
+}
+
+void Parser::READ()
+{
+	gl();
+	if (c_type!=LEX_LPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_ID)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_RPAREN)
+	{
+		throw curr_lex;
+	}
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		throw curr_lex;
+	}
+	gl();
+}
+
+void Parser::EXPRESSIONOP()
+{
+	EXPR();
+	gl();
+	if (c_type!=LEX_SEMICOLON)
+	{
+		throw curr_lex;
+	}
+	gl();
+}
+
+
+void Parser::EXPR()
+{
+	EXPR1();
+	EXPR11();
+}
+
+void Parser::EXPR11()
+{
+	if (c_type==LEX_EQUAL)
+	{
+		gl();
+		EXPR1();
+		EXPR11();
+	}
+}
+
+void Parser::EXPR1()
+{
+	EXPR2();
+	EXPROR();
+}
+
+void Parser::EXPROR()
+{
+	if (c_type==LEX_OR)
+	{
+		gl();
+		EXPR2();
+		EXPROR();
+	}
+}
+
+void Parser::EXPR2()
+{
+	EXPR3();
+	EXPRAND();
+}
+
+void Parser::EXPRAND()
+{
+	if (c_type==LEX_AND)
+	{
+		gl();
+		EXPR3();
+		EXPRAND();
+	}
+}
+
+void Parser::EXPR3()
+{
+	EXPR4();
+	EXPR41();
+}
+
+void Parser::EXPR41()
+{
+	if (c_type==LEX_LS||c_type==LEX_GTR||c_type==LEX_DEQUAL||c_type==LEX_NEQUAL||c_type==LEX_LEQ||c_type==LEX_GEQ)
+	{
+		gl();
+		EXPR3();
+	}
+}
+
+void Parser::EXPR4()
+{
+	if (c_type==LEX_MINUS||c_type==LEX_PLUS)
+	{
+		gl();
+		EXPR5();
+		EXPR51();
+	}
+	else
+	{
+		EXPR5();
+		EXPR51();
+	}
+}
+
+void Parser::EXPR51()
+{
+	if (c_type==LEX_MINUS||c_type==LEX_PLUS)
+	{
+		gl();
+		EXPR5();
+		EXPR51();
+	}
+}
+
+void Parser::EXPR5()
+{
+	EXPR6();
+	EXPR61();
+}
+
+void Parser::EXPR61()
+{
+	gl();
+	if (c_type==LEX_TIMES||c_type==LEX_SLASH)
+	{
+		gl();
+		EXPR6();
+		EXPR61();
+	}
+}
+
+void Parser::EXPR6()
+{
+	if (c_type==LEX_NOT)
+	{
+		gl();
+		EXPR7();
+	}
+	else
+	{
+		EXPR7();
+	}
+}
+
+void Parser::EXPR7()
+{
+	if (c_type==LEX_ID||c_type==LEX_CSTRING||c_type==LEX_CINT||c_type==LEX_CREAL)
+	{
+		/* ok */ 
+	}
+	else if (c_type==LEX_LPAREN)
+	{
+		EXPR();
+		gl();
+		if (c_type!=LEX_RPAREN)
+		{
+			throw curr_lex;
+		}
+	}
+}
+
+
+
 int main ()
 {
 	std::ofstream fout;
 	fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
 	// prog - исходная программа на модельном языке
-	Scanner scan("./prog");
-	Lex curr_lex(LEX_NULL, 0);
+	Parser pars("./prog");
 	try
 	{
-	while (true)
-	{
-		curr_lex=scan.get_lex();
-		fout << curr_lex;
-		if (curr_lex.get_type()==LEX_FIN)
-		{
-			break;
-		}
+		pars.analyze();
 	}
+	catch (Lex curr_lex)
+	{
+		fout.close();
+		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
+		fout << curr_lex << std::endl;
 	}
 	catch (char const *message)
 	{
