@@ -156,6 +156,10 @@ public:
 	{
 		assign=true;
 	}
+	void put_type(type_of_lex ctype)
+	{
+		type=ctype;
+	}
 };
 
 class tabl_ident
@@ -176,6 +180,10 @@ public:
 	Ident& operator[] (int k)
 	{
 		return table[k];
+	}
+	int get_top()
+	{
+		return top;
 	}
 	int put (const char *buf);	
 };
@@ -755,9 +763,12 @@ class Parser
 	Lex curr_lex;
 	type_of_lex c_type;
 	Scanner scan;
-	Stack <int, 100> st_int;
 	Stack <type_of_lex, 100> st_lex;
 	int c_val;
+
+	/* 	нужно для обработки описаний */
+	bool is_int, is_real, is_string;
+	int var_in_program; // считаем, сколько переменных лежит в TID
 
 	void PROG();
 	/* description */
@@ -794,6 +805,8 @@ class Parser
 	void EXPR6();
 	void EXPR61();
 	void EXPR7();
+	/* обработка описаний*/
+	void declare();
 
 	void gl()
 	{
@@ -816,6 +829,7 @@ void Parser::analyze()
 
 void Parser::PROG()
 {
+	var_in_program=0;
 	if (c_type==LEX_PROGRAM)
 	{
 		gl();
@@ -849,6 +863,21 @@ void Parser::DESCR()
 {
 	if (c_type==LEX_INT||c_type==LEX_STRING||c_type==LEX_REAL)
 	{
+		if (c_type==LEX_INT)
+		{
+			is_real=is_string=false;
+			is_int=true;
+		}
+		else if (c_type==LEX_STRING)
+		{
+			is_real=is_int=false;
+			is_string=true;
+		}
+		else if (c_type==LEX_REAL)
+		{
+			is_string=is_int=false;
+			is_real=true;
+		}
 		gl();
 		DESCR1();
 		if (c_type==LEX_SEMICOLON)
@@ -891,6 +920,7 @@ void Parser::VAR()
 {
 	if (c_type==LEX_ID)
 	{
+		declare();
 		gl();
 		VAR2();
 	}
@@ -918,14 +948,30 @@ void Parser::CONST1()
 	if (c_type==LEX_PLUS||c_type==LEX_MINUS)
 	{
 		gl();
-		if (c_type!=LEX_CINT&&c_type!=LEX_REAL)
+		if (c_type!=LEX_CINT&&c_type!=LEX_CREAL)
 		{
 			throw curr_lex;
+		}
+		if ((is_int&&c_type==LEX_CINT)||(is_real&&c_type==LEX_CREAL)||(is_real&&c_type==LEX_CINT))
+		{
+			// OK
+		}
+		else
+		{
+			throw "Несоответствие типов операндов";
 		}
 		gl();
 	}
 	else if (c_type==LEX_CINT||c_type==LEX_CREAL||c_type==LEX_CSTRING)
 	{
+		if ((is_int&&c_type==LEX_CINT)||(is_real&&(c_type==LEX_CINT||c_type==LEX_CREAL))||(is_string&&c_type==LEX_CSTRING))
+		{
+			// OK
+		}
+		else
+		{
+			throw "Несоответствие типов операндов";
+		}
 		gl();
 	}
 	else
@@ -1219,17 +1265,8 @@ void Parser::EXPR41()
 
 void Parser::EXPR4()
 {
-	if (c_type==LEX_MINUS||c_type==LEX_PLUS)
-	{
-		gl();
-		EXPR5();
-		EXPR51();
-	}
-	else
-	{
-		EXPR5();
-		EXPR51();
-	}
+	EXPR5();
+	EXPR51();
 }
 
 void Parser::EXPR51()
@@ -1264,7 +1301,17 @@ void Parser::EXPR6()
 	if (c_type==LEX_NOT)
 	{
 		gl();
-		EXPR7();
+		EXPR6();
+	}
+	else if (c_type==LEX_MINUS)
+	{
+		gl();
+		EXPR6();
+	}
+	else if (c_type==LEX_PLUS)
+	{
+		gl();
+		EXPR6();
 	}
 	else
 	{
@@ -1293,6 +1340,30 @@ void Parser::EXPR7()
 	}
 }
 
+void Parser::declare()
+{
+	var_in_program++;
+	if (var_in_program!=(TID.get_top()-1))
+	{
+		throw "second description";
+	}
+	else
+	{
+		TID[var_in_program].put_declare();
+		if (is_string==true)
+		{
+			TID[var_in_program].put_type(LEX_STRING);
+		}
+		else if (is_real==true)
+		{
+			TID[var_in_program].put_type(LEX_REAL);
+		}
+		else if (is_int==true)
+		{
+			TID[var_in_program].put_type(LEX_INT);
+		}
+	}
+}
 
 
 int main ()
@@ -1314,6 +1385,7 @@ int main ()
 	}
 	catch (char const *message)
 	{
+		std::cout << "Ошибка на этапе ЛА, либо семантического анализа (конкретная ошибка в файле output)" << std::endl;
 		fout.close();
 		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
 		fout << message << std::endl;
