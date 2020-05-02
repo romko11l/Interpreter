@@ -1,0 +1,37 @@
+PROG -> <var_in_program=0;> program { DESCR OP }
+
+DESCR -> DESCR1 ; DESCR | eps
+DESCR1 -> int <is_real=is_string=false; is_int=false> VAR VAR1 | string <is_real=is_int=false; is_string=true> VAR VAR1 | real <is_int=is_string=false; is_real=false> VAR VAR1 
+VAR1 -> , VAR VAR1 | eps
+VAR -> identifier <declare();> VAR2
+VAR2 -> = CONST1 | eps
+CONST1 -> +creal <проверка типов> | -creal <проверка типов> | +cint <проверка типов> | -cint <проверка типов> | cstring <проверка типов> | cint <проверка типов> | creal <проверка типов>
+
+OP (statement) -> OP1 OP | eps;
+OP1 -> IFELSE | WHILE | FOR | READ | WRITE | COMPLEXOP | EXPRESSIONOP | continue ;
+IFELSE -> if ( EXPR ) OP1 else OP1
+WHILE -> while ( EXPR ) OP1
+READ -> read ( ident ) ;
+WRITE -> write ( EXPR WRITE1 ) ;
+WRITE1 -> , EXPR WRITE1 | eps
+COMPLEXOP -> { OP }
+EXPRESSIONOP -> EXPR ;
+FOR -> for ( FOR1 ; FOR1 ; FOR1 ) OP1
+FOR1 -> EXPR | eps                    // ВАЖНО: из EXPR не выводится eps 
+CONTINUE -> continue ;
+
+EXPR -> EXPR1 EXPR11
+EXPR11 -> = EXPR1 EXPR11 | eps 
+EXPR1 -> EXPR2 EXPROR
+EXPROR -> or EXPR2 EXPROR | eps
+EXPR2 -> EXPR3 EXPRAND
+EXPRAND -> and EXPR3 EXPRAND | eps
+EXPR3 -> EXPR4 EXPR41
+EXPR41 -> < EXPR3 | > EXPR3 | <= EXPR3 | >= EXPR3 | == EXPR3 | != EXPR3
+EXPR4 -> EXPR5 EXPR51
+EXPR51 -> + EXPR5 EXPR51 | - EXPR5 EXPR51 | eps
+EXPR5 -> EXPR6 EXPR61
+EXPR61 -> * EXPR6 EXPR61 | / EXPR6 EXPR61 | eps
+EXPR6 -> not EXPR6 | - EXPR6 | + EXPR6 | EXPR7
+EXPR7 -> ident | creal | cint | cstring | (EXPR)
+
