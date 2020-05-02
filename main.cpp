@@ -45,7 +45,11 @@ enum type_of_lex
     LEX_CONT,     // continue //33
     LEX_REAL,     // real (имя типа) //34
     LEX_COMMA,    // , //35
-    LEX_FIN       //  //36
+    LEX_FIN,      // //36
+    POLIZ_LABEL,  // для ссылок на номера элементов ПОЛИЗа //37
+	POLIZ_ADDRES, // для обозначения операндов-адресов //38
+	POLIZ_GO,	  // ! //39
+	POLIZ_FGO     // F! //40
 };
 
 
@@ -102,11 +106,17 @@ public:
 
 class Ident
 {
+	// тут по-видимому придётся делать поле значений 
 	char * name;
+	bool declare;
+	bool assign;
+	type_of_lex type;
 	bool is_used;
 public:
 	Ident ()
 	{
+		declare=false;
+		assign=false;
 		is_used=false;
 	}
 	~Ident ()
@@ -125,6 +135,26 @@ public:
 		is_used=true;
 		name=new char [strlen(n)+1];
 		strcpy(name, n);
+	}
+	bool get_declare()
+	{
+		return declare;
+	}
+	void put_declare()
+	{
+		declare=true;
+	}
+	type_of_lex get_type()
+	{
+		return type;
+	}
+	bool get_assign()
+	{
+		return assign;
+	}
+	void put_assign()
+	{
+		assign=true;
 	}
 };
 
@@ -660,11 +690,74 @@ std::ofstream& operator << (std::ofstream &s, Lex l)
 	return s;
 }
 
+/*
+Эта шаблон нужен для семантического анализатора
+*/
+
+template <class T, int max_size> class Stack
+{
+	T s[max_size];
+	int top;
+public:
+	Stack()
+	{
+		top=0;
+	}	
+	void reset()
+	{
+		top=0;
+	}
+	void push(T i);
+	T pop();
+	bool is_empty()
+	{
+		return top==0;
+	}
+	bool is_full()
+	{
+		return top==max_size;
+	}
+};
+
+template <class T, int max_size>
+
+void Stack <T, max_size>::push(T i)
+{
+	if (!is_full())
+	{
+		s[top]=i;
+		++top;
+	}
+	else 
+	{
+		throw "Stack_is_full";
+	}
+}
+
+template <class T, int max_size>
+
+T Stack <T, max_size>::pop()
+{
+	if (!is_empty())
+	{
+		--top;
+		return s[top];
+	}
+	else
+	{
+		throw "Stack_is_empty";
+	}
+}
+
+
 class Parser
 {
 	Lex curr_lex;
 	type_of_lex c_type;
 	Scanner scan;
+	Stack <int, 100> st_int;
+	Stack <type_of_lex, 100> st_lex;
+	int c_val;
 
 	void PROG();
 	/* description */
