@@ -757,14 +757,77 @@ T Stack <T, max_size>::pop()
 	}
 }
 
+/*
+ПОЛИЗ
+*/
+
+class Poliz
+{
+	Lex *p;
+	int size;
+	int free;
+public:
+	Poliz (int max_size)
+	{
+		p = new Lex [size=max_size];
+		free=0;
+	};
+	~ Poliz ()
+	{
+		delete []p;
+	}	
+	void put_lex (Lex l)
+	{
+		p[free]=l;
+		++free;
+	}
+	void put_lex (Lex l, int place)
+	{
+		p[place]=l;
+	}
+	void blank ()
+	{
+		++free;
+	}
+	int get_free ()
+	{
+		return free;
+	}
+	Lex& operator[] (int index)
+	{
+		if (index>size)
+		{
+			throw "Выход за пределы ПОЛИЗ массива";
+		}
+		else
+		{
+			if (index>free)
+			{
+				throw "Искомого элемента нет в ПОЛИЗ массиве";
+			}
+			else
+			{
+				return p[index];
+			}
+		}
+	}
+	void print ()
+	{
+		for (int i=0; i<free; i++)
+		{
+			std::cout << p[i];
+		}
+		std::cout<< std::endl; 
+	}
+};
 
 class Parser
 {
 	Lex curr_lex;
 	type_of_lex c_type;
 	Scanner scan;
-	Stack <type_of_lex, 100> st_lex;
-	int c_val;
+	Stack <Lex, 100> st_lex;
+	int c_val; // показывает по каким номером лежит индентификатор в TID
 
 	/* 	нужно для обработки описаний */
 	bool is_int, is_real, is_string;
@@ -805,18 +868,27 @@ class Parser
 	void EXPR6();
 	void EXPR61();
 	void EXPR7();
-	/* обработка описаний*/
+	/*контроль контекстных условий в описаниях*/
 	void declare();
+	/*контроль контекстных условий в выражении*/
+	void check_id(Lex l);
+	void check_op_eq();
+	void check_op();
+	void check_not();
+	void check_unary_op();
+	void check_id_in_read();
 
 	void gl()
 	{
 		curr_lex=scan.get_lex();
 		c_type=curr_lex.get_type();
+		c_val=curr_lex.get_value();
 		std::cout<< curr_lex << std::endl;
 	}
 
 public:
-	Parser (const char* program) : scan ("./prog") { }
+	Poliz prog;
+	Parser (const char* program) : scan ("./prog"), prog(1000) { }
 	void analyze();
 };
 	
@@ -989,6 +1061,7 @@ void Parser::OP()
 	else 
 	{
 		OP1();
+		st_lex.reset();
 		OP();
 	}
 }
@@ -1202,19 +1275,33 @@ void Parser::EXPRESSIONOP()
 
 void Parser::EXPR()
 {
+	int eq_num=0;
 	EXPR1();
-	EXPR11();
+	while (c_type==LEX_EQUAL)
+	{
+		st_lex.push(curr_lex);
+		eq_num++;
+		gl();
+		EXPR1();
+	}
+	while (eq_num>0)
+	{
+		check_op_eq();
+		eq_num--;
+	}
 }
 
-void Parser::EXPR11()
+/*void Parser::EXPR11()
 {
 	if (c_type==LEX_EQUAL)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR1();
+		check_op();
 		EXPR11();
 	}
-}
+}*/
 
 void Parser::EXPR1()
 {
@@ -1226,8 +1313,10 @@ void Parser::EXPROR()
 {
 	if (c_type==LEX_OR)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR2();
+		check_op();
 		EXPROR();
 	}
 }
@@ -1242,8 +1331,10 @@ void Parser::EXPRAND()
 {
 	if (c_type==LEX_AND)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR3();
+		check_op();
 		EXPRAND();
 	}
 }
@@ -1258,8 +1349,11 @@ void Parser::EXPR41()
 {
 	if (c_type==LEX_LS||c_type==LEX_GTR||c_type==LEX_DEQUAL||c_type==LEX_NEQUAL||c_type==LEX_LEQ||c_type==LEX_GEQ)
 	{
+		st_lex.push(curr_lex);
 		gl();
-		EXPR3();
+		EXPR4();
+		check_op();
+		EXPR41();
 	}
 }
 
@@ -1273,8 +1367,10 @@ void Parser::EXPR51()
 {
 	if (c_type==LEX_MINUS||c_type==LEX_PLUS)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR5();
+		check_op();
 		EXPR51();
 	}
 }
@@ -1324,6 +1420,11 @@ void Parser::EXPR7()
 	if (c_type==LEX_ID||c_type==LEX_CSTRING||c_type==LEX_CINT||c_type==LEX_CREAL)
 	{
 		/* ok */ 
+		if (c_type==LEX_ID)
+		{
+			check_id(curr_lex);
+		}
+		st_lex.push(curr_lex);
 	}
 	else if (c_type==LEX_LPAREN)
 	{
@@ -1365,6 +1466,203 @@ void Parser::declare()
 	}
 }
 
+/*
+Проверяем, описан ли идентификатор
+*/
+
+void Parser::check_id(Lex l)
+{
+	if (TID[l.get_value()].get_declare())
+	{
+		/*OK*/
+	}
+	else
+	{
+		throw "Идентификатор не задекларирован";
+	}
+}
+
+void Parser::check_op_eq()
+{
+	Lex lex1,lex2,op; 
+	type_of_lex temp_type1, temp_type2;
+	lex2=st_lex.pop();
+	op=st_lex.pop();
+	lex1=st_lex.pop(); // lex1 op lex2 
+	/* похоже, что для = как правоассоциативной операции надо делать свой check_op потому, что нужно сначала пройти до конца цепочки равенств, записав
+	лексемы в стек, и потом начинать выуживать   */
+	if (op.get_type()==LEX_EQUAL)
+	{
+		if (lex1.get_type()!=LEX_ID)
+		{
+			throw "Несоответствие типов операндов: слева от = стоит не идентификатор";
+		}
+		else
+		{
+			temp_type1=TID[lex1.get_value()].get_type(); // получили, какой тип имеет данная переменная
+			temp_type2=lex2.get_type();
+			if (lex2.get_type()==LEX_ID)
+			{
+				temp_type2=TID[lex2.get_value()].get_type();
+			}
+			if (temp_type1==LEX_REAL)
+			{
+				if (temp_type2==LEX_INT||temp_type2==LEX_CINT||temp_type2==LEX_CREAL||temp_type2==LEX_REAL)
+				{
+					// OK
+					st_lex.push(LEX_CREAL);
+				}
+				else
+				{
+					throw "Несоответствие типов операндов: неудачная попытка привести к real";
+				}
+			}
+			else if (temp_type1==LEX_INT)
+			{
+				if (temp_type2==LEX_INT||temp_type2==LEX_CINT)
+				{
+					// OK
+					st_lex.push(LEX_CINT);
+				}
+				else
+				{
+					throw "Несоответствие типов операндов: неудачная попытка привести к int";
+				}
+			}
+			else if (temp_type1==LEX_STRING)
+			{
+				if (temp_type2==LEX_STRING||temp_type2==LEX_CSTRING)
+				{
+					// OK
+					st_lex.push(LEX_CSTRING);
+				}
+				else
+				{
+					throw "Несоответствие типов операндов: неудачная попытка привести к string";
+				}
+			}
+		}
+	}
+}
+
+void Parser::check_op()
+{
+	Lex lex1,lex2,op; 
+	type_of_lex temp_type1, temp_type2;
+	lex2=st_lex.pop();
+	op=st_lex.pop();
+	lex1=st_lex.pop(); // lex1 op lex2 
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (lex2.get_type()!=LEX_ID)
+	{
+		temp_type2=lex2.get_type();
+	}
+	else
+	{
+		temp_type2=TID[lex2.get_value()].get_type();
+	}
+	if (op.get_type()==LEX_OR)
+	{
+		if (temp_type1!=LEX_INT&&temp_type1!=LEX_CINT)
+		{
+			throw "Некорректный операнд перед or";
+		}
+		if (temp_type2!=LEX_INT&&temp_type2!=LEX_CINT)
+		{
+			throw "Некорректный операнд после or";
+		}
+		st_lex.push(LEX_CINT);
+	}
+	else if (op.get_type()==LEX_AND)
+	{
+		if (temp_type1!=LEX_INT&&temp_type1!=LEX_CINT)
+		{
+			throw "Некорректный операнд перед and";
+		}
+		if (temp_type2!=LEX_INT&&temp_type2!=LEX_CINT)
+		{
+			throw "Некорректный операнд после and";
+		}
+		st_lex.push(LEX_CINT);
+	}
+	else if (op.get_type()==LEX_LS||op.get_type()==LEX_DEQUAL||op.get_type()==LEX_LEQ||op.get_type()==LEX_GTR||op.get_type()==LEX_GEQ||op.get_type()==LEX_NEQUAL)
+	{
+		if (temp_type1==LEX_STRING||temp_type1==LEX_CSTRING)
+		{
+			if (temp_type1==LEX_STRING||temp_type1==LEX_CSTRING)
+			{
+				// OK
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка сравнить строку с не-строкой";
+			}
+		}
+		else if (temp_type1==LEX_INT||temp_type1==LEX_CINT||temp_type1==LEX_REAL||temp_type1==LEX_CREAL)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT||temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка сравнить число с не-числом";
+			}
+		}
+		st_lex.push(LEX_CINT);
+	}
+	else if (op.get_type()==LEX_PLUS)
+	{
+		if (temp_type1==LEX_STRING||temp_type1==LEX_CSTRING)
+		{
+			if (temp_type2==LEX_STRING||temp_type2==LEX_CSTRING)
+			{
+				// OK
+				st_lex.push(LEX_CSTRING);
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка прибавить к строке не-строку";
+			}
+		}
+		else if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT)
+			{
+				// OK
+				st_lex.push(LEX_CINT);
+			}
+			else if (temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK
+				st_lex.push(LEX_CREAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка прибавить к числу не-число";
+			}
+		}
+		else if (temp_type1==LEX_REAL||temp_type1==LEX_CREAL)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT||temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK
+				st_lex.push(LEX_CREAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка прибавить к числу не-число";
+			}
+		}
+	}
+}
 
 int main ()
 {
