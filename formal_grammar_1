@@ -32,7 +32,7 @@ EXPR4 -> EXPR5 EXPR51
 EXPR51 -> + <st_lex.push(curr_lex);> EXPR5 <check_op();> EXPR51 | - <st_lex.push(curr_lex);> EXPR5 <check_op();> EXPR51 | eps
 EXPR5 -> EXPR6 EXPR61
 EXPR61 -> * <st_lex.push(curr_lex);> EXPR6 <check_op();> EXPR61 | / <st_lex.push(curr_lex);> EXPR6 <check_op();> EXPR61 | eps
-EXPR6 -> not EXPR6 <check_not();> | - EXPR6 <check_unary_op();> | + EXPR6 <check_unary_op();> | EXPR7
+EXPR6 -> not <st_lex.push(curr_lex);> EXPR6 <check_not();> | - <st_lex.push(curr_lex);> EXPR6 <check_unary_op();> | + <st_lex.push(curr_lex);> EXPR6 <check_unary_op();> | EXPR7
 EXPR7 -> ident <check_id(); <st_lex.push(curr_lex);> | creal <st_lex.push(curr_lex);> | cint <st_lex.push(curr_lex);> | cstring <st_lex.push(curr_lex);>| (EXPR)
 
 
@@ -45,4 +45,4 @@ EXPR7 -> ident <check_id(); <st_lex.push(curr_lex);> | creal <st_lex.push(curr_l
 
 У операторов if else, while, read, write, for свои функции проверки типов 
 
-Для унарных плюса и минуса нужно сделать отдельные типы.
+Для унарных плюса и минуса нужно сделать отдельные типы (при помещении в ПОЛИЗ).

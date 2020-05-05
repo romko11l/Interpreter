@@ -1386,8 +1386,10 @@ void Parser::EXPR61()
 	gl();
 	if (c_type==LEX_TIMES||c_type==LEX_SLASH)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
+		check_op();
 		EXPR61();
 	}
 }
@@ -1396,18 +1398,24 @@ void Parser::EXPR6()
 {
 	if (c_type==LEX_NOT)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
+		check_not();
 	}
 	else if (c_type==LEX_MINUS)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
+		check_unary_op();
 	}
 	else if (c_type==LEX_PLUS)
 	{
+		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
+		check_unary_op();
 	}
 	else
 	{
@@ -1568,7 +1576,7 @@ void Parser::check_op()
 	{
 		temp_type2=TID[lex2.get_value()].get_type();
 	}
-	if (op.get_type()==LEX_OR)
+	if (op.get_type()==LEX_OR) // or
 	{
 		if (temp_type1!=LEX_INT&&temp_type1!=LEX_CINT)
 		{
@@ -1580,7 +1588,7 @@ void Parser::check_op()
 		}
 		st_lex.push(LEX_CINT);
 	}
-	else if (op.get_type()==LEX_AND)
+	else if (op.get_type()==LEX_AND) // and
 	{
 		if (temp_type1!=LEX_INT&&temp_type1!=LEX_CINT)
 		{
@@ -1592,7 +1600,7 @@ void Parser::check_op()
 		}
 		st_lex.push(LEX_CINT);
 	}
-	else if (op.get_type()==LEX_LS||op.get_type()==LEX_DEQUAL||op.get_type()==LEX_LEQ||op.get_type()==LEX_GTR||op.get_type()==LEX_GEQ||op.get_type()==LEX_NEQUAL)
+	else if (op.get_type()==LEX_LS||op.get_type()==LEX_DEQUAL||op.get_type()==LEX_LEQ||op.get_type()==LEX_GTR||op.get_type()==LEX_GEQ||op.get_type()==LEX_NEQUAL) // сравнения
 	{
 		if (temp_type1==LEX_STRING||temp_type1==LEX_CSTRING)
 		{
@@ -1618,7 +1626,7 @@ void Parser::check_op()
 		}
 		st_lex.push(LEX_CINT);
 	}
-	else if (op.get_type()==LEX_PLUS)
+	else if (op.get_type()==LEX_PLUS) // бинарный плюс
 	{
 		if (temp_type1==LEX_STRING||temp_type1==LEX_CSTRING)
 		{
@@ -1661,6 +1669,140 @@ void Parser::check_op()
 				throw "Некорретный операнд: попытка прибавить к числу не-число";
 			}
 		}
+	}
+	else if (op.get_type()==LEX_MINUS) //бинарный минус
+	{
+		if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT)
+			{
+				// OK
+				st_lex.push(LEX_CINT);
+			}
+			else if (temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK 
+				st_lex.push(LEX_CREAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка отнять от числа не-число";
+			}
+		}
+		else if (temp_type1==LEX_REAL||temp_type1==LEX_CREAL)
+		{
+			if (temp_type2==LEX_REAL||temp_type2==LEX_CREAL||temp_type2==LEX_INT||temp_type2==LEX_CINT)
+			{
+				// OK
+				st_lex.push(LEX_REAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: попытка отнять от числа не-число";
+			}
+		}
+		else
+		{
+			throw "Некорретный операнд: слева от знака - стоит не число";
+		}
+	}
+	else if (op.get_type()==LEX_SLASH||op.get_type()==LEX_TIMES)
+	{
+		if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT)
+			{
+				// OK
+				st_lex.push(LEX_CINT);
+			}
+			else if (temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK
+				st_lex.push(LEX_CREAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: поделить (умножить) число на не-число";
+			}
+		}
+		else if (temp_type1==LEX_REAL||temp_type1==LEX_CREAL)
+		{
+			if (temp_type2==LEX_INT||temp_type2==LEX_CINT||temp_type2==LEX_REAL||temp_type2==LEX_CREAL)
+			{
+				// OK
+				st_lex.push(LEX_CREAL);
+			}
+			else
+			{
+				throw "Некорретный операнд: поделить (умножить) число на не-число";
+			}
+		}
+		else
+		{
+			throw "Некорретный операнд: слева от знака / (*) стоит не число";
+		}
+	}
+}
+
+void Parser::check_unary_op()
+{
+	Lex lex1, op;
+	type_of_lex temp_type1;
+	lex1=st_lex.pop();
+	op=st_lex.pop();
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (op.get_type()==LEX_MINUS||op.get_type()==LEX_PLUS) // унарный минус
+	{
+		if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+		{
+			// OK
+			st_lex.push(LEX_CINT);
+		}
+		else if (temp_type1==LEX_REAL||temp_type1==LEX_CREAL)
+		{
+			// OK
+			st_lex.push(LEX_REAL);
+		}		
+		else
+		{
+			throw "Некорретный операнд: справа от унарного минуса (плюса) стоит не число";
+		}
+	}
+}
+
+void Parser::check_not()
+{
+	Lex lex1, op;
+	type_of_lex temp_type1;
+	lex1=st_lex.pop();
+	op=st_lex.pop();
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (op.get_type()==LEX_NOT)
+	{
+		if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+		{
+			// OK
+			st_lex.push(LEX_CINT);
+		}
+		else
+		{
+			throw "Некорретный операнд: справа от not стоит не целое число";
+		}
+
 	}
 }
 
