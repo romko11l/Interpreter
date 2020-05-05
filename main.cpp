@@ -753,7 +753,7 @@ T Stack <T, max_size>::pop()
 	}
 	else
 	{
-		throw "Stack_is_empty";
+		throw 1; // надо выкидывать не строку для условия цикла for
 	}
 }
 
@@ -877,6 +877,10 @@ class Parser
 	void check_not();
 	void check_unary_op();
 	void check_id_in_read();
+	/*Прочий контроль контекстных условий*/
+	void check_if();
+	void check_while();
+	void check_for();
 
 	void gl()
 	{
@@ -1116,6 +1120,7 @@ void Parser::IFELSE()
 	}
 	gl();
 	EXPR();
+	check_if();
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
@@ -1153,6 +1158,7 @@ void Parser::READ()
 	{
 		throw curr_lex;
 	}
+	check_id(curr_lex);
 	gl();
 	if (c_type!=LEX_RPAREN)
 	{
@@ -1211,6 +1217,7 @@ void Parser::WHILE()
 	}
 	gl();
 	EXPR();
+	check_while();
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
@@ -1235,10 +1242,19 @@ void Parser::FOR()
 	{
 		throw curr_lex;
 	}
+	st_lex.reset();
 	gl();
 	if (c_type!=LEX_SEMICOLON)
 	{
 		FOR1();
+	}
+	try
+	{
+		check_for();
+	}
+	catch(int)
+	{
+		// Ничего страшного - стек операций был пуст - в цикле for нет условия - работаем дальше
 	}
 	if (c_type!=LEX_SEMICOLON)
 	{
@@ -1806,6 +1822,75 @@ void Parser::check_not()
 	}
 }
 
+void Parser::check_if()
+{
+	Lex lex1;
+	type_of_lex temp_type1;
+	lex1=st_lex.pop();
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+	{
+		// OK
+	}
+	else
+	{
+		throw "Внутри условия в операторе if стоит не целое число";
+	}
+}
+
+void Parser::check_while()
+{
+	Lex lex1;
+	type_of_lex temp_type1;
+	lex1=st_lex.pop();
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+	{
+		// OK
+	}
+	else
+	{
+		throw "Внутри условия в операторе while стоит не целое число";
+	}
+}
+
+void Parser::check_for()
+{
+	Lex lex1;
+	type_of_lex temp_type1;
+	lex1=st_lex.pop();
+	if (lex1.get_type()!=LEX_ID)
+	{
+		temp_type1=lex1.get_type();
+	}
+	else
+	{
+		temp_type1=TID[lex1.get_value()].get_type();
+	}
+	if (temp_type1==LEX_INT||temp_type1==LEX_CINT)
+	{
+		// OK
+	}
+	else
+	{
+		throw "Внутри условия в операторе for стоит не целое число";
+	}
+}
+
 int main ()
 {
 	std::ofstream fout;
@@ -1835,6 +1920,13 @@ int main ()
 		fout.close();
 		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
 		fout << "bad_alloc" << std::endl;
+	}
+	catch (int)
+	{
+		std::cout << "Ошибка на этапе ЛА, либо семантического анализа (конкретная ошибка в файле output)" << std::endl;
+		fout.close();
+		fout.open ("./Output", std::ios_base::out|std::ios_base::trunc);
+		fout << "Попытка извлечения из пустого стека операций (скорее всего ошибка в условии цикла for) " << std::endl;
 	}
 	fout.close();
 	return 0;

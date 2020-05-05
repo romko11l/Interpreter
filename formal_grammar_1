@@ -8,15 +8,15 @@ VAR2 -> = CONST1 | eps
 CONST1 -> +creal <проверка типов> | -creal <проверка типов> | +cint <проверка типов> | -cint <проверка типов> | cstring <проверка типов> | cint <проверка типов> | creal <проверка типов>
 
 OP (statement) -> OP1 <st_lex.reset();> OP | eps;
-OP1 -> IFELSE | WHILE | FOR | READ | WRITE | COMPLEXOP | EXPRESSIONOP | continue ;
-IFELSE -> if ( EXPR ) OP1 else OP1
-WHILE -> while ( EXPR ) OP1
-READ -> read ( ident <check_id();> ) ;
+OP1 -> IFELSE <st_lex.reset();> | WHILE ... | FOR ... | READ ... | WRITE ... | COMPLEXOP ... | EXPRESSIONOP ... | continue ... ; // тут надо подумать, насколько это обязательно (в программу это пока не вставлено)
+IFELSE -> if ( EXPR <check_if();> ) OP1 else OP1
+WHILE -> while ( EXPR <check_while();> ) OP1
+READ -> read ( ident <check_id(curr_lex);> ) ;
 WRITE -> write ( EXPR WRITE1 ) ;
 WRITE1 -> , EXPR WRITE1 | eps
 COMPLEXOP -> { OP }
 EXPRESSIONOP -> EXPR ;
-FOR -> for ( FOR1 ; FOR1 ; FOR1 ) OP1
+FOR -> for ( FOR1 ; <st_lex.reset()> FOR1 <check_for()>  ; FOR1 ) OP1 
 FOR1 -> EXPR | eps                    // ВАЖНО: из EXPR не выводится eps 
 CONTINUE -> continue ;
 
