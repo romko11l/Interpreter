@@ -62,6 +62,7 @@ class Lex
 	std::string str_value;
 	bool is_int, is_real, is_str;
 	bool is_unary;
+	int address; // нужно для перехода
 public:
 	Lex (type_of_lex t = LEX_NULL, int v = 0)
     {
@@ -96,6 +97,19 @@ public:
         is_int=is_real=false;
         is_str=true;
         str_value=s;
+    }
+    Lex (std::string, type_of_lex t, int addr)
+    {
+    	is_int=is_real=is_str=false;
+    	if (t!=POLIZ_LABEL)
+    	{
+    		throw "Попытка использовать лексему POLIZ_LABEL не по назначению";
+    	}
+    	else
+    	{
+    		t_lex=POLIZ_LABEL;
+    		address=addr;
+    	}
     }
     type_of_lex get_type ()
     {
@@ -639,33 +653,45 @@ std::ostream& operator << (std::ostream &s, Lex l)
 {
 	if (l.is_int==true)
 	{
-		s << "Сама лексема: \"" << l.int_value << "\", тип лексемы: " << l.t_lex << std::endl;
+		s << l.int_value << " " << std::endl;
 	}
 	else if (l.is_real==true)
 	{
-		s << "Сама лексема: \"" << l.real_value << "\", тип лексемы: " << l.t_lex << std::endl;
+		s  << l.real_value << " " << std::endl;
 	}
 	else if (l.is_str==true)
 	{
-		s << "Сама лексема: \"" << l.str_value << "\", тип лексемы: " << l.t_lex << std::endl;
+		s  << l.str_value << " " << std::endl;
 	}
 	else
 	{
 		if (l.t_lex==LEX_ID)
 		{
-			s << "Сама лексема: \"" << TID[l.v_lex].get_name() << "\", тип лексемы: " << l.t_lex << " (номер в таблице идентификаторов: " << l.v_lex << ")" << std::endl;
+			s  << TID[l.v_lex].get_name() << std::endl;
 		}
 		else if (l.t_lex==LEX_FIN)
 		{
 			s << "Сама лексема: \"EOF\", тип лексемы: " << l.t_lex << std::endl;
 		}
+		else if (l.t_lex==POLIZ_LABEL)
+		{
+			s << l.address << "          POLIZ_LABEL " << std::endl;
+		}
+		else if (l.t_lex==POLIZ_GO)
+		{
+			s << "!" << std::endl;
+		}
+		else if (l.t_lex==POLIZ_FGO)
+		{
+			s << "!F" <<  std::endl;
+		}
 		else if (l.t_lex==Scanner::dlms[l.v_lex])
 		{
-			s << "Сама лексема: \"" << Scanner::TD[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+			s << Scanner::TD[l.v_lex] << std::endl;
 		}
 		else
 		{
-			s << "Сама лексема: \"" << Scanner::TW[l.v_lex] << "\", тип лексемы: " << l.t_lex << std::endl;
+			s << Scanner::TW[l.v_lex] << std::endl;
 		}
 	}
 	return s;
@@ -694,6 +720,18 @@ std::ofstream& operator << (std::ofstream &s, Lex l)
 		else if (l.t_lex==LEX_FIN)
 		{
 			s << "Сама лексема: \"EOF\", тип лексемы: " << l.t_lex << std::endl;
+		}
+		else if (l.t_lex==POLIZ_LABEL)
+		{
+			s << "Адрес перехода в ПОЛИЗ-массиве \"" << l.address << "\", POLIZ_ADDRESS " << std::endl;
+		}
+		else if (l.t_lex==POLIZ_GO)
+		{
+			s << "Команда безусловного перехода ПОЛИЗ-массива: \"" << "!" << "\", POLIZ_GO " << std::endl;
+		}
+		else if (l.t_lex==POLIZ_FGO)
+		{
+			s << "Команда перехода по лжи ПОЛИЗ-массива: \"" << "!F" << "\", POLIZ_FGO " << std::endl;
 		}
 		else if (l.t_lex==Scanner::dlms[l.v_lex])
 		{
@@ -824,11 +862,12 @@ public:
 	{
 		for (int i=0; i<free; i++)
 		{
-			std::cout << p[i];
+			std::cout << i << ") " << p[i];
 		}
 		std::cout<< std::endl; 
 	}
 };
+
 
 class Parser
 {
@@ -837,6 +876,7 @@ class Parser
 	Scanner scan;
 	Stack <Lex, 100> st_lex;
 	int c_val; // показывает по каким номером лежит индентификатор в TID
+	int curr_conditional; // показывает адрес условия текущего цикла (нужно для continue)
 
 	/* 	нужно для обработки описаний */
 	bool is_int, is_real, is_string;
@@ -859,7 +899,7 @@ class Parser
 	void FOR1();
 	void READ();
 	void WRITE();
-	void WRITE1();
+	void WRITE1(Lex l);
 	void COMPLEXOP();
 	void EXPRESSIONOP();
 	/* expression */ 
@@ -901,7 +941,7 @@ class Parser
 
 public:
 	Poliz prog;
-	Parser (const char* program) : scan ("./prog"), prog(1000) { }
+	Parser (const char* program) : scan ("./prog"), prog(1000) { curr_conditional=-1; }
 	void analyze();
 };
 	
@@ -1101,6 +1141,12 @@ void Parser::OP1()
 	}
 	else if (c_type==LEX_CONT)
 	{
+		if (curr_conditional==-1)
+		{
+			throw "Встречен continue вне цикла";
+		}
+		prog.put_lex(Lex ("0_0", POLIZ_LABEL, curr_conditional));
+		prog.put_lex(Lex (POLIZ_GO));
 		gl();
 		if (c_type!=LEX_SEMICOLON)
 		{
@@ -1132,6 +1178,7 @@ void Parser::OP1()
 
 void Parser::IFELSE()
 {
+	int label1,label2;
 	gl();
 	if (c_type!=LEX_LPAREN)
 	{
@@ -1140,6 +1187,9 @@ void Parser::IFELSE()
 	gl();
 	EXPR();
 	check_if();
+	label1=prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_FGO));
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
@@ -1150,8 +1200,13 @@ void Parser::IFELSE()
 	{
 		throw curr_lex;
 	}
+	label2=prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_GO));
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, prog.get_free()), label1);
 	gl();
 	OP1();
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, prog.get_free()), label2);
 }
 
 void Parser::COMPLEXOP()
@@ -1198,6 +1253,8 @@ void Parser::READ()
 
 void Parser::WRITE()
 {
+	Lex l;
+	l=curr_lex;
 	gl();
 	if (c_type!=LEX_LPAREN)
 	{
@@ -1205,7 +1262,8 @@ void Parser::WRITE()
 	}
 	gl();
 	EXPR();
-	WRITE1();
+	prog.put_lex(l);
+	WRITE1(l);
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
@@ -1218,7 +1276,7 @@ void Parser::WRITE()
 	gl();
 }
 
-void Parser::WRITE1()
+void Parser::WRITE1(Lex l)  // передаём лексему LEX_WRITE
 {
 	if (c_type!=LEX_COMMA)
 	{
@@ -1228,30 +1286,45 @@ void Parser::WRITE1()
 	{
 		gl();
 		EXPR();
-		WRITE1();
+		prog.put_lex(l);
+		WRITE1(l);
 	}
 }
 
 void Parser::WHILE()
 {
+	int condition_addr, exit_addr, exit_label;
 	gl();
 	if (c_type!=LEX_LPAREN)
 	{
 		throw curr_lex;
 	}
+	condition_addr=prog.get_free();
+	curr_conditional=condition_addr;
 	gl();
 	EXPR();
 	check_while();
+	exit_label=prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_FGO));
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
 	}
 	gl();
 	OP1();
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, condition_addr));
+	prog.put_lex(Lex (POLIZ_GO));
+	exit_addr=prog.get_free();
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, exit_addr), exit_label);
+	curr_conditional=-1;
 }
 
-void Parser::FOR()
+void Parser::FOR() // for (A;B;C) D
 {
+	int addr_B, addr_C, addr_exit;
+	int label_B, label_C;
+	bool check=false;
 	gl();
 	if (c_type!=LEX_LPAREN)
 	{
@@ -1260,7 +1333,7 @@ void Parser::FOR()
 	gl();
 	if (c_type!=LEX_SEMICOLON)
 	{
-		FOR1();
+		FOR1(); // A
 	}
 	if (c_type!=LEX_SEMICOLON)
 	{
@@ -1268,10 +1341,16 @@ void Parser::FOR()
 	}
 	st_lex.reset();
 	gl();
+	addr_B=prog.get_free();
 	if (c_type!=LEX_SEMICOLON)
 	{
-		FOR1();
+		check=true;
+		FOR1(); // B
 	}
+	if (check==false) // в цикле for нет условия
+	{
+		prog.put_lex (Lex (LEX_CINT, 0, 1)); // ложим на место условия истинное выражение 
+	} 
 	try
 	{
 		check_for();
@@ -1280,21 +1359,37 @@ void Parser::FOR()
 	{
 		// Ничего страшного - стек операций был пуст - в цикле for нет условия - работаем дальше
 	}
+	label_B=prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_FGO));
+	label_C=prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_GO));
 	if (c_type!=LEX_SEMICOLON)
 	{
 		throw curr_lex;
 	}
 	gl();
+	addr_C=prog.get_free();
 	if (c_type!=LEX_RPAREN)
 	{
-		FOR1();
+		FOR1(); // C
 	}
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_B), prog.get_free());
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_GO));
 	if (c_type!=LEX_RPAREN)
 	{
 		throw curr_lex;
 	}
 	gl();
-	OP1();
+	OP1(); // D
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, prog.get_free()), label_C);
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_C), prog.get_free());
+	prog.blank();
+	prog.put_lex(Lex (POLIZ_GO));
+	addr_exit=prog.get_free();
+	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_exit), label_B);
 }
 
 void Parser::FOR1()
