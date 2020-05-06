@@ -47,7 +47,7 @@ enum type_of_lex
     LEX_COMMA,    // , //35
     LEX_FIN,      // //36
     POLIZ_LABEL,  // для ссылок на номера элементов ПОЛИЗа //37
-	POLIZ_ADDRES, // для обозначения операндов-адресов //38
+	POLIZ_ADDRESS, // для обозначения операндов-адресов //38
 	POLIZ_GO,	  // ! //39
 	POLIZ_FGO     // F! //40
 };
@@ -61,15 +61,18 @@ class Lex
 	double real_value;
 	std::string str_value;
 	bool is_int, is_real, is_str;
+	bool is_unary;
 public:
 	Lex (type_of_lex t = LEX_NULL, int v = 0)
     {
+    	is_unary=false;
         t_lex=t;
         v_lex=v;
         is_int=is_real=is_str=false;
     }
     Lex (type_of_lex t, int v, int i)
     {
+    	is_unary=false;
     	t_lex=t;
         v_lex=v;
         is_real=is_str=false;
@@ -78,6 +81,7 @@ public:
     }
     Lex (type_of_lex t, int v, double r)
     {
+    	is_unary=false;
         t_lex=t;
         v_lex=v;
         is_int=is_str=false;
@@ -86,6 +90,7 @@ public:
     }
     Lex (type_of_lex t, int v, std::string s)
     {
+    	is_unary=false;
         t_lex=t;
         v_lex=v;
         is_int=is_real=false;
@@ -99,6 +104,10 @@ public:
     int get_value ()
     {
         return v_lex;
+    }
+    void unary()
+    {
+    	is_unary=true;
     }
     friend std::ostream& operator << (std::ostream &s, Lex l);
     friend std::ofstream& operator << (std::ofstream &s, Lex l);
@@ -901,6 +910,7 @@ void Parser::analyze()
 	gl();
 	PROG();
 	std::cout << "Is correct" << std::endl;
+	prog.print();
 }
 
 void Parser::PROG()
@@ -997,6 +1007,7 @@ void Parser::VAR()
 	if (c_type==LEX_ID)
 	{
 		declare();
+		prog.put_lex(curr_lex);
 		gl();
 		VAR2();
 	}
@@ -1008,10 +1019,13 @@ void Parser::VAR()
 
 void Parser::VAR2()
 {
+	Lex l;
+	l=curr_lex;
 	if (c_type==LEX_EQUAL)
 	{
 		gl();
 		CONST1();
+		prog.put_lex(l);
 	}
 	else
 	{
@@ -1021,8 +1035,10 @@ void Parser::VAR2()
 
 void Parser::CONST1()
 {
+	Lex l;
 	if (c_type==LEX_PLUS||c_type==LEX_MINUS)
 	{
+		l=curr_lex;
 		gl();
 		if (c_type!=LEX_CINT&&c_type!=LEX_CREAL)
 		{
@@ -1031,6 +1047,8 @@ void Parser::CONST1()
 		if ((is_int&&c_type==LEX_CINT)||(is_real&&c_type==LEX_CREAL)||(is_real&&c_type==LEX_CINT))
 		{
 			// OK
+			prog.put_lex(curr_lex);
+			prog.put_lex(l);
 		}
 		else
 		{
@@ -1043,6 +1061,7 @@ void Parser::CONST1()
 		if ((is_int&&c_type==LEX_CINT)||(is_real&&(c_type==LEX_CINT||c_type==LEX_CREAL))||(is_string&&c_type==LEX_CSTRING))
 		{
 			// OK
+			prog.put_lex(curr_lex);
 		}
 		else
 		{
@@ -1148,6 +1167,8 @@ void Parser::COMPLEXOP()
 
 void Parser::READ()
 {
+	Lex lread,lid;
+	lread=curr_lex;
 	gl();
 	if (c_type!=LEX_LPAREN)
 	{
@@ -1159,6 +1180,7 @@ void Parser::READ()
 		throw curr_lex;
 	}
 	check_id(curr_lex);
+	lid=curr_lex;
 	gl();
 	if (c_type!=LEX_RPAREN)
 	{
@@ -1170,6 +1192,8 @@ void Parser::READ()
 		throw curr_lex;
 	}
 	gl();
+	prog.put_lex(lid);
+	prog.put_lex(lread);
 }
 
 void Parser::WRITE()
@@ -1291,10 +1315,12 @@ void Parser::EXPRESSIONOP()
 
 void Parser::EXPR()
 {
+	Lex l;
 	int eq_num=0;
 	EXPR1();
 	while (c_type==LEX_EQUAL)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		eq_num++;
 		gl();
@@ -1302,6 +1328,7 @@ void Parser::EXPR()
 	}
 	while (eq_num>0)
 	{
+		prog.put_lex(l);
 		check_op_eq();
 		eq_num--;
 	}
@@ -1327,12 +1354,15 @@ void Parser::EXPR1()
 
 void Parser::EXPROR()
 {
+	Lex l;
 	if (c_type==LEX_OR)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		gl();
 		EXPR2();
 		check_op();
+		prog.put_lex(l);
 		EXPROR();
 	}
 }
@@ -1345,12 +1375,15 @@ void Parser::EXPR2()
 
 void Parser::EXPRAND()
 {
+	Lex l;
 	if (c_type==LEX_AND)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		gl();
 		EXPR3();
 		check_op();
+		prog.put_lex(l);
 		EXPRAND();
 	}
 }
@@ -1363,12 +1396,15 @@ void Parser::EXPR3()
 
 void Parser::EXPR41()
 {
+	Lex l;
 	if (c_type==LEX_LS||c_type==LEX_GTR||c_type==LEX_DEQUAL||c_type==LEX_NEQUAL||c_type==LEX_LEQ||c_type==LEX_GEQ)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		gl();
 		EXPR4();
 		check_op();
+		prog.put_lex(l);
 		EXPR41();
 	}
 }
@@ -1381,12 +1417,15 @@ void Parser::EXPR4()
 
 void Parser::EXPR51()
 {
+	Lex l;
 	if (c_type==LEX_MINUS||c_type==LEX_PLUS)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		gl();
 		EXPR5();
 		check_op();
+		prog.put_lex(l);
 		EXPR51();
 	}
 }
@@ -1399,39 +1438,52 @@ void Parser::EXPR5()
 
 void Parser::EXPR61()
 {
+	Lex l;
 	gl();
 	if (c_type==LEX_TIMES||c_type==LEX_SLASH)
 	{
+		l=curr_lex;
 		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
 		check_op();
+		prog.put_lex(l);
 		EXPR61();
 	}
 }
 
 void Parser::EXPR6()
 {
+	Lex l;
 	if (c_type==LEX_NOT)
 	{
+		l=curr_lex;
+		l.unary();
 		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
 		check_not();
+		prog.put_lex(l);
 	}
 	else if (c_type==LEX_MINUS)
 	{
+		l=curr_lex;
+		l.unary();
 		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
 		check_unary_op();
+		prog.put_lex(l);
 	}
 	else if (c_type==LEX_PLUS)
 	{
+		l=curr_lex;
+		l.unary();
 		st_lex.push(curr_lex);
 		gl();
 		EXPR6();
 		check_unary_op();
+		prog.put_lex(l);
 	}
 	else
 	{
@@ -1449,6 +1501,7 @@ void Parser::EXPR7()
 			check_id(curr_lex);
 		}
 		st_lex.push(curr_lex);
+		prog.put_lex(curr_lex);
 	}
 	else if (c_type==LEX_LPAREN)
 	{
