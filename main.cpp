@@ -687,6 +687,11 @@ std::ostream& operator << (std::ostream &s, Lex l)
 		}
 		else if (l.t_lex==Scanner::dlms[l.v_lex])
 		{
+			if ((l.t_lex==LEX_MINUS||l.t_lex==LEX_PLUS)&&(l.is_unary))
+			{
+				s << Scanner::TD[l.v_lex] << " (унарный)" << std::endl;
+				return s;
+			}
 			s << Scanner::TD[l.v_lex] << std::endl;
 		}
 		else
@@ -882,6 +887,8 @@ class Parser
 	bool is_int, is_real, is_string;
 	int var_in_program; // считаем, сколько переменных лежит в TID
 
+	Lex standart_semicolon; // эталон ; для вставки в ПОЛИЗ
+
 	void PROG();
 	/* description */
 	void DESCR();
@@ -936,12 +943,16 @@ class Parser
 		curr_lex=scan.get_lex();
 		c_type=curr_lex.get_type();
 		c_val=curr_lex.get_value();
-		std::cout<< curr_lex << std::endl;
+		//std::cout<< curr_lex << std::endl;
 	}
 
 public:
 	Poliz prog;
-	Parser (const char* program) : scan ("./prog"), prog(1000) { curr_conditional=-1; }
+	Parser (const char* program) : scan ("./prog"), prog(1000)
+	{ 
+		curr_conditional=-1;
+		standart_semicolon=Lex (LEX_SEMICOLON, 9);
+	}
 	void analyze();
 };
 	
@@ -1050,6 +1061,7 @@ void Parser::VAR()
 		prog.put_lex(curr_lex);
 		gl();
 		VAR2();
+		prog.put_lex(standart_semicolon);
 	}
 	else
 	{
@@ -1262,7 +1274,8 @@ void Parser::WRITE()
 	}
 	gl();
 	EXPR();
-	prog.put_lex(l);
+	prog.put_lex(l, prog.get_free()-1);
+	prog.put_lex(standart_semicolon); // при реализации вычислений после вывода не убирать из стека вычислений то, что мы вывели, чтобы всё удалялост корректно
 	WRITE1(l);
 	if (c_type!=LEX_RPAREN)
 	{
@@ -1286,7 +1299,8 @@ void Parser::WRITE1(Lex l)  // передаём лексему LEX_WRITE
 	{
 		gl();
 		EXPR();
-		prog.put_lex(l);
+		prog.put_lex(l, prog.get_free()-1);
+		prog.put_lex(standart_semicolon);
 		WRITE1(l);
 	}
 }
@@ -1370,6 +1384,7 @@ void Parser::FOR() // for (A;B;C) D
 		throw curr_lex;
 	}
 	gl();
+	curr_conditional=prog.get_free();
 	addr_C=prog.get_free();
 	if (c_type!=LEX_RPAREN)
 	{
@@ -1383,13 +1398,14 @@ void Parser::FOR() // for (A;B;C) D
 		throw curr_lex;
 	}
 	gl();
-	OP1(); // D
 	prog.put_lex(Lex ("0_0", POLIZ_LABEL, prog.get_free()), label_C);
+	OP1(); // D
 	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_C), prog.get_free());
 	prog.blank();
 	prog.put_lex(Lex (POLIZ_GO));
 	addr_exit=prog.get_free();
 	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_exit), label_B);
+	curr_conditional=-1;
 }
 
 void Parser::FOR1()
@@ -1427,6 +1443,7 @@ void Parser::EXPR()
 		check_op_eq();
 		eq_num--;
 	}
+	prog.put_lex(standart_semicolon);
 }
 
 /*void Parser::EXPR11()
