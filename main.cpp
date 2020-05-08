@@ -897,6 +897,7 @@ class Parser
 	void VAR1();
 	void VAR2();
 	void CONST1();
+	void CONST2();
 	/* statement */ 
 	void OP();
 	void OP1();
@@ -1091,8 +1092,11 @@ void Parser::CONST1()
 	if (c_type==LEX_PLUS||c_type==LEX_MINUS)
 	{
 		l=curr_lex;
+		l.unary();
 		gl();
-		if (c_type!=LEX_CINT&&c_type!=LEX_CREAL)
+		CONST2();
+		prog.put_lex(l);
+		/*if (c_type!=LEX_CINT&&c_type!=LEX_CREAL)
 		{
 			throw curr_lex;
 		}
@@ -1106,7 +1110,7 @@ void Parser::CONST1()
 		{
 			throw "Несоответствие типов операндов";
 		}
-		gl();
+		gl();*/ 
 	}
 	else if (c_type==LEX_CINT||c_type==LEX_CREAL||c_type==LEX_CSTRING)
 	{
@@ -1119,6 +1123,29 @@ void Parser::CONST1()
 		{
 			throw "Несоответствие типов операндов";
 		}
+		gl();
+	}
+	else
+	{
+		throw curr_lex;
+	}
+}
+
+void Parser::CONST2()
+{
+	Lex l;
+	if (c_type==LEX_PLUS||c_type==LEX_MINUS)
+	{
+		l=curr_lex;
+		l.unary();
+		gl();
+		CONST2();
+		prog.put_lex(l);
+	}
+	else if ((is_int&&c_type==LEX_CINT)||(is_real&&(c_type==LEX_CINT||c_type==LEX_CREAL)))
+	{
+		// OK
+		prog.put_lex(curr_lex);
 		gl();
 	}
 	else
