@@ -504,7 +504,6 @@ Lex Scanner::get_lex ()
 				else if (c=='"')
 				{
 					clear();
-					add();
 					gc();
 					CS=STR;
 				}
@@ -665,7 +664,6 @@ Lex Scanner::get_lex ()
 			{
 				if (c=='"')
 				{
-					add();
 					gc();
 					return Lex(LEX_CSTRING,0,(std::string)buf);
 				}
@@ -713,7 +711,7 @@ std::ostream& operator << (std::ostream &s, Lex l)
 	}
 	else if (l.is_str==true)
 	{
-		s  << l.str_value << " " << std::endl;
+		s << "\"" << l.str_value << "\"" << std::endl;
 	}
 	else
 	{
