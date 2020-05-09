@@ -139,6 +139,10 @@ public:
     {
     	return is_unary==true;
     }
+    int get_address()
+    {
+    	return address;
+    }
     friend std::ostream& operator << (std::ostream &s, Lex l);
     friend std::ofstream& operator << (std::ofstream &s, Lex l);
 };
@@ -828,6 +832,7 @@ public:
 	void print()
 	{
 		int i=0;
+		std::cout << "Новый срез:" << std::endl;
 		while (i<top)
 		{
 			std::cout << s[i];
@@ -983,7 +988,7 @@ void Executer::execute(Poliz& prog)
 						condition=TID[tid_pos].get_int();
 					}
 				}
-				else if (curr_lex.get_type()==LEX_INT)
+				else if (curr_lex.get_type()==LEX_CINT)
 				{
 					condition=curr_lex.get_int();
 				}
@@ -1391,6 +1396,108 @@ void Executer::execute(Poliz& prog)
 					}
 				}
 				break;	
+			case LEX_TIMES: // type2*type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1*cint2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CREAL, 0, creal1*cint2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CREAL, 0, cint1*creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CREAL, 0, creal1*creal2));
+				}
+				break;	
+			case LEX_SLASH: // type2/type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					if (cint1==0)
+					{
+						throw "Деление на 0";
+					}
+					args.push(Lex (LEX_CINT, 0, cint2/cint1));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					if (creal1==0)
+					{
+						throw "Деление на 0";
+					}
+					args.push(Lex (LEX_CREAL, 0, cint2/creal1));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					if (cint1==0)
+					{
+						throw "Деление на 0";
+					}
+					args.push(Lex (LEX_CREAL, 0, creal2/cint1));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					if (creal1==0)
+					{
+						throw "Деление на 0";
+					}
+					args.push(Lex (LEX_CREAL, 0, creal2/creal1));
+				}
+				break;
+			case LEX_NOT:
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				args.push(Lex (LEX_CINT, 0, !(cint1)));
+				break;
+			case POLIZ_LABEL:
+				args.push(curr_lex);
+				break;	
+			case POLIZ_GO:
+				curr_lex=args.pop();
+				index=curr_lex.get_address()-1;
+				break;
+			case POLIZ_FGO:
+				curr_lex=args.pop();
+				cint2=curr_lex.get_address();
+				try
+				{
+					curr_lex=args.pop();
+					compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				}	
+				catch(int x)
+				{
+					if (x==1)
+					{
+						// мы попали в ситуацию, когда удалили условие - надо смотреть в переменной condition
+						// на самом деле ситуация, при которой мы вытаскиваем из стека условие удачно только одна: for(...; <пусто> ; ...)
+						cint1=condition;
+					}
+					else
+					{
+						throw;
+					}
+				}
+				if (cint1==0) // осуществляем переход по лжи
+				{
+					index=cint2-1;
+				}
+				else
+				{
+					// никуда не переходим
+				}
+				break;
 			default:
 				// Здесь мы не должны оказаться
 				break;	
@@ -1532,7 +1639,15 @@ void Parser::analyze()
 	PROG();
 	std::cout << "Is correct" << std::endl;
 	prog.print();
-	execution.execute(prog);
+	try
+	{
+		execution.execute(prog);
+	}
+	catch (char const *message)
+	{
+		std::cout << std::endl;
+		std::cout << message << std::endl;
+	}
 }
 
 void Parser::PROG()
