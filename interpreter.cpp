@@ -135,6 +135,10 @@ public:
     {
     	is_unary=true;
     }
+    bool get_unary()
+    {
+    	return is_unary==true;
+    }
     friend std::ostream& operator << (std::ostream &s, Lex l);
     friend std::ofstream& operator << (std::ofstream &s, Lex l);
 };
@@ -930,8 +934,16 @@ public:
 class Executer
 {
 	Lex curr_lex;
+	int condition;
 public:
+	Executer()
+	{
+		condition=0;
+	}
 	void execute(Poliz& prog);
+
+	/*Вспомогательные функции*/
+	void compare_helper(int& cint, double& creal, std::string& cstring, type_of_lex& type, Lex& curr_lex);
 };
 
 void Executer::execute(Poliz& prog)
@@ -942,13 +954,13 @@ void Executer::execute(Poliz& prog)
 	int cint1, cint2;
 	std::string cstring1, cstring2; 
 	Lex upper_op;
+	type_of_lex type1, type2;
 	while (index<size)
 	{
 		//args.print();  // показывает текущее состояние стека вычислений
 		curr_lex=prog[index];
 		switch (curr_lex.get_type())
 		{
-
 			case LEX_ID:
 				args.push(curr_lex);
 				break;
@@ -962,7 +974,19 @@ void Executer::execute(Poliz& prog)
 				args.push(curr_lex);
 				break;		
 			case LEX_SEMICOLON:
-				args.pop();
+				curr_lex=args.pop();
+				if (curr_lex.get_type()==LEX_ID)
+				{
+					tid_pos=curr_lex.get_value();
+					if (TID[tid_pos].get_type()==LEX_INT)
+					{
+						condition=TID[tid_pos].get_int();
+					}
+				}
+				else if (curr_lex.get_type()==LEX_INT)
+				{
+					condition=curr_lex.get_int();
+				}
 				break;
 			case LEX_EQUAL:
 				upper_op=args.pop();
@@ -1094,12 +1118,324 @@ void Executer::execute(Poliz& prog)
 				}
 				args.push(curr_lex);
 				break;
+			case LEX_OR:
+				curr_lex=args.pop();
+				if (curr_lex.get_type()==LEX_ID)
+				{
+					tid_pos=curr_lex.get_value();
+					cint1=TID[tid_pos].get_int();
+				}
+				else if (curr_lex.get_type()==LEX_CINT)
+				{
+					cint1=curr_lex.get_int();
+				}
+				curr_lex=args.pop();
+				if (curr_lex.get_type()==LEX_ID)
+				{
+					tid_pos=curr_lex.get_value();
+					cint2=TID[tid_pos].get_int();
+				}
+				else if (curr_lex.get_type()==LEX_CINT)
+				{
+					cint2=curr_lex.get_int();
+				}
+				args.push(Lex (LEX_CINT, 0, (cint1||cint2)));
+				break;	
+			case LEX_AND:
+				curr_lex=args.pop();
+				if (curr_lex.get_type()==LEX_ID)
+				{
+					tid_pos=curr_lex.get_value();
+					cint1=TID[tid_pos].get_int();
+				}
+				else if (curr_lex.get_type()==LEX_CINT)
+				{
+					cint1=curr_lex.get_int();
+				}
+				curr_lex=args.pop();
+				if (curr_lex.get_type()==LEX_ID)
+				{
+					tid_pos=curr_lex.get_value();
+					cint2=TID[tid_pos].get_int();
+				}
+				else if (curr_lex.get_type()==LEX_CINT)
+				{
+					cint2=curr_lex.get_int();
+				}
+				args.push(Lex (LEX_CINT, 0, (cint1&&cint2)));
+				break;	
+			case LEX_DEQUAL:
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1==cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1==creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1==cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1==creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1==cint2));
+				}	
+				break;
+			case LEX_NEQUAL:
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1!=cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1!=creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1!=cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1!=creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1!=cint2));
+				}	
+				break;
+			case LEX_LS: // type2<type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1>cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1>creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1>cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1>creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1>cint2));
+				}	
+				break;
+			case LEX_LEQ: // type2<=type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1>=cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1>=creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1>=cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1>=creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1>=cint2));
+				}	
+				break;
+			case LEX_GTR: // type2>type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1<cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1<creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1<cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1<creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1<cint2));
+				}	
+				break;	
+			case LEX_GEQ: // type2>=type1
+				curr_lex=args.pop();
+				compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+				curr_lex=args.pop();
+				compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+				if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+				{
+					args.push(Lex (LEX_CINT, 0, cstring1<=cstring2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1<=creal2));
+				}
+				else if (type1==LEX_CINT&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1<=cint2));
+				}	
+				else if (type1==LEX_CINT&&type2==LEX_CREAL)
+				{
+					args.push(Lex (LEX_CINT, 0, cint1<=creal2));
+				}
+				else if (type1==LEX_CREAL&&type2==LEX_CINT)
+				{
+					args.push(Lex (LEX_CINT, 0, creal1<=cint2));
+				}	
+				break;		
+			case LEX_PLUS:
+				if (curr_lex.get_unary()==true) // унарный случай
+				{
+					// не надо ничего делать
+				}
+				else // бинарный случай 
+				{
+					curr_lex=args.pop();
+					compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+					curr_lex=args.pop();
+					compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+					if (type1==LEX_CSTRING&&type2==LEX_CSTRING)
+					{
+						args.push(Lex (LEX_CSTRING, 0, cstring2+cstring1));
+					}
+					else if (type1==LEX_CINT&&type2==LEX_CINT)
+					{
+						args.push(Lex (LEX_CINT, 0, cint1+cint2));
+					}
+					else if (type1==LEX_CINT&&type2==LEX_CREAL)
+					{
+						args.push(Lex (LEX_CREAL, 0, cint1+creal2));
+					}
+					else if (type1==LEX_CREAL&&type2==LEX_CINT)
+					{
+						args.push(Lex (LEX_CREAL, 0, creal1+cint2));
+					}
+					else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+					{
+						args.push(Lex (LEX_CREAL, 0, creal1+creal2));
+					}
+				}
+				break;
+			case LEX_MINUS:
+				if (curr_lex.get_unary()==true) // унарный случай
+				{
+					curr_lex=args.pop();
+					compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+					if (type1==LEX_CINT)
+					{
+						args.push(Lex (LEX_CINT, 0, -cint1));
+					}
+					else if (type1==LEX_CREAL)
+					{
+						args.push(Lex (LEX_CREAL, 0, -creal1));
+					}
+				}
+				else // бинарный случай // type2-type1
+				{
+					curr_lex=args.pop();
+					compare_helper(cint1, creal1, cstring1, type1, curr_lex);
+					curr_lex=args.pop();
+					compare_helper(cint2, creal2, cstring2, type2, curr_lex);
+					if (type1==LEX_CINT&&type2==LEX_CINT)
+					{
+						args.push(Lex (LEX_CINT, 0, -cint1+cint2));
+					}
+					else if (type1==LEX_CREAL&&type2==LEX_CINT)
+					{
+						args.push(Lex (LEX_CREAL, 0, -creal1+cint2));
+					}
+					else if (type1==LEX_CINT&&type2==LEX_CREAL)
+					{
+						args.push(Lex (LEX_CREAL, 0, -cint1+creal2));
+					}
+					else if (type1==LEX_CREAL&&type2==LEX_CREAL)
+					{
+						args.push(Lex (LEX_CREAL, 0, -creal1+creal2));
+					}
+				}
+				break;	
 			default:
 				// Здесь мы не должны оказаться
 				break;	
 				
 		}
 		index++;
+	}
+}
+
+void Executer::compare_helper(int& cint, double& creal, std::string& cstring, type_of_lex& type, Lex& curr_lex)
+{
+	int tid_pos;
+	if (curr_lex.get_type()==LEX_ID)
+	{
+		tid_pos=curr_lex.get_value();
+		if (TID[tid_pos].get_type()==LEX_INT)
+		{
+			type=LEX_CINT;
+			cint=TID[tid_pos].get_int();
+		}
+		else if (TID[tid_pos].get_type()==LEX_REAL)
+		{
+			type=LEX_CREAL;
+			creal=TID[tid_pos].get_real();
+		}
+		else if (TID[tid_pos].get_type()==LEX_STRING)
+		{
+			type=LEX_CSTRING;
+			cstring=TID[tid_pos].get_string();
+		}
+	}
+	else if (curr_lex.get_type()==LEX_CINT)
+	{
+		type=LEX_CINT;
+		cint=curr_lex.get_int();
+	}
+	else if (curr_lex.get_type()==LEX_CREAL)
+	{
+		type=LEX_CREAL;
+		creal=curr_lex.get_real();
+	}
+	else if (curr_lex.get_type()==LEX_CSTRING)
+	{
+		type=LEX_CSTRING;
+		cstring=curr_lex.get_string();
 	}
 }
 
@@ -1117,6 +1453,8 @@ class Parser
 	int var_in_program; // считаем, сколько переменных лежит в TID
 
 	Lex standart_semicolon; // эталон ; для вставки в ПОЛИЗ
+
+	int check_paren; // нужно для корректной вставки ; в выражение
 
 	void PROG();
 	/* description */
@@ -1182,6 +1520,7 @@ public:
 	{ 
 		curr_conditional=-1;
 		standart_semicolon=Lex (LEX_SEMICOLON, 9);
+		check_paren=0;
 	}
 	void analyze();
 	Executer execution;
@@ -1701,7 +2040,14 @@ void Parser::EXPR()
 		check_op_eq();
 		eq_num--;
 	}
-	prog.put_lex(standart_semicolon);
+	if (check_paren==0)
+	{
+		prog.put_lex(standart_semicolon);
+	}
+	else
+	{
+		check_paren--;
+	}
 }
 
 /*void Parser::EXPR11()
@@ -1875,6 +2221,7 @@ void Parser::EXPR7()
 	}
 	else if (c_type==LEX_LPAREN)
 	{
+		check_paren++;
 		gl();
 		EXPR();
 		if (c_type!=LEX_RPAREN)
