@@ -1735,7 +1735,7 @@ void Parser::check_op_eq()
 			}
 			else if (temp_type1==LEX_INT)
 			{
-				if (temp_type2==LEX_INT||temp_type2==LEX_CINT)
+				if (temp_type2==LEX_INT||temp_type2==LEX_CINT||temp_type2==LEX_CREAL||temp_type2==LEX_REAL)
 				{
 					// OK
 					st_lex.push(LEX_CINT);
