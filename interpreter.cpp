@@ -1552,6 +1552,7 @@ class Parser
 	Stack <Lex, 100> st_lex;
 	int c_val; // показывает по каким номером лежит индентификатор в TID
 	int curr_conditional; // показывает адрес условия текущего цикла (нужно для continue)
+	Stack <int, 100> conditional_stack; // будем хранить тут адреса начала циклов (нужно для случая вложенных циклов)
 
 	/* 	нужно для обработки описаний */
 	bool is_int, is_real, is_string;
@@ -1863,11 +1864,17 @@ void Parser::OP1()
 	}
 	else if (c_type==LEX_CONT)
 	{
-		if (curr_conditional==-1)
+		try
 		{
-			throw "Встречен continue вне цикла";
+			curr_conditional=conditional_stack.pop();
+		}
+		catch(...)
+		{
+			throw "continue встречен вне цикла";
 		}
 		prog.put_lex(Lex ("0_0", POLIZ_LABEL, curr_conditional));
+		conditional_stack.push(curr_conditional);
+		curr_conditional=-1;
 		prog.put_lex(Lex (POLIZ_GO));
 		gl();
 		if (c_type!=LEX_SEMICOLON)
@@ -2025,6 +2032,7 @@ void Parser::WHILE()
 	}
 	condition_addr=prog.get_free();
 	curr_conditional=condition_addr;
+	conditional_stack.push(curr_conditional);
 	gl();
 	EXPR();
 	check_while();
@@ -2042,6 +2050,7 @@ void Parser::WHILE()
 	exit_addr=prog.get_free();
 	prog.put_lex(Lex ("0_0", POLIZ_LABEL, exit_addr), exit_label);
 	curr_conditional=-1;
+	conditional_stack.pop();
 }
 
 void Parser::FOR() // for (A;B;C) D
@@ -2095,6 +2104,7 @@ void Parser::FOR() // for (A;B;C) D
 	}
 	gl();
 	curr_conditional=prog.get_free();
+	conditional_stack.push(curr_conditional);
 	addr_C=prog.get_free();
 	if (c_type!=LEX_RPAREN)
 	{
@@ -2116,6 +2126,7 @@ void Parser::FOR() // for (A;B;C) D
 	addr_exit=prog.get_free();
 	prog.put_lex(Lex ("0_0", POLIZ_LABEL, addr_exit), label_B);
 	curr_conditional=-1;
+	conditional_stack.pop();
 }
 
 void Parser::FOR1()
